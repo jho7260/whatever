@@ -1,0 +1,909 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="theme-color" content="#7ec0ee" />
+<title>PokéCraft — Minecraft + Pokémon</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='15' fill='%23ee1515'/%3E%3Cpath d='M1 16h30' stroke='%23222' stroke-width='3'/%3E%3Cpath d='M1 16a15 15 0 0 0 30 0z' fill='%23f0f0f0'/%3E%3Ccircle cx='16' cy='16' r='4' fill='%23fff' stroke='%23222' stroke-width='2'/%3E%3C/svg%3E" />
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+:root { --poke-red: #ee1515; --poke-dark: #222224; }
+
+html, body {
+  width: 100%; height: 100%; overflow: hidden;
+  background: #7ec0ee;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  color: #fff;
+  touch-action: none;
+  -webkit-user-select: none; user-select: none;
+  overscroll-behavior: none;
+}
+
+.hidden { display: none !important; }
+
+/* ---------- Loading ---------- */
+#loading {
+  position: fixed; inset: 0; z-index: 50;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  background: radial-gradient(circle at 50% 30%, #9bd0f5, #4a90d9);
+  gap: 18px;
+}
+#loading h1 { font-size: 2.4rem; letter-spacing: 1px; text-shadow: 2px 2px 0 #00000033; }
+#loading p { opacity: .85; }
+
+.pokeball-spin, .pokeball-logo {
+  width: 84px; height: 84px; border-radius: 50%;
+  background:
+    linear-gradient(#ee1515 0 50%, #f0f0f0 50% 100%);
+  border: 5px solid #222224; position: relative;
+  box-shadow: 0 8px 24px #0003;
+}
+.pokeball-spin { animation: spin 1.1s linear infinite; }
+.pokeball-spin::after, .pokeball-logo::after {
+  content: ""; position: absolute; top: 50%; left: 50%;
+  width: 26px; height: 26px; border-radius: 50%;
+  background: #fff; border: 5px solid #222224; transform: translate(-50%, -50%);
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ---------- Menu ---------- */
+#menu {
+  position: fixed; inset: 0; z-index: 40;
+  display: flex; align-items: center; justify-content: center;
+  background: radial-gradient(circle at 50% 20%, #9bd0f5, #3a78bd);
+  padding: 20px;
+}
+.menu-card {
+  background: #ffffff14; backdrop-filter: blur(8px);
+  border: 1px solid #ffffff33; border-radius: 20px;
+  padding: 28px 24px; max-width: 420px; text-align: center;
+  box-shadow: 0 20px 60px #0004;
+}
+.menu-card .pokeball-logo { margin: 0 auto 12px; }
+.menu-card h1 { font-size: 2.2rem; margin-bottom: 8px; text-shadow: 2px 2px 0 #00000033; }
+.menu-card .tag { opacity: .9; margin-bottom: 20px; line-height: 1.4; }
+#play-btn {
+  font-size: 1.3rem; font-weight: 700; color: #fff; cursor: pointer;
+  background: linear-gradient(#ff5b5b, var(--poke-red));
+  border: 3px solid #222224; border-radius: 14px;
+  padding: 14px 40px; box-shadow: 0 6px 0 #a30d0d; transition: transform .08s;
+}
+#play-btn:active { transform: translateY(4px); box-shadow: 0 2px 0 #a30d0d; }
+.menu-card .hint {
+  margin-top: 18px; font-size: .82rem; opacity: .85; line-height: 1.5;
+  background: #00000022; padding: 10px 12px; border-radius: 10px;
+}
+
+/* ---------- Game / HUD ---------- */
+#game { position: fixed; inset: 0; z-index: 10; }
+#c { display: block; width: 100%; height: 100%; }
+
+#crosshair {
+  position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+  font-size: 22px; color: #ffffffcc; text-shadow: 0 0 3px #000; pointer-events: none; z-index: 12;
+}
+
+#topbar {
+  position: fixed; top: calc(env(safe-area-inset-top) + 8px); left: 0; right: 0;
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 0 14px; z-index: 12; pointer-events: none;
+}
+#health { display: flex; gap: 2px; font-size: 18px; filter: drop-shadow(0 1px 1px #000); }
+#coords {
+  font-size: 12px; background: #00000055; padding: 4px 8px; border-radius: 8px;
+  font-variant-numeric: tabular-nums;
+}
+
+#hotbar {
+  position: fixed; bottom: calc(env(safe-area-inset-bottom) + 10px); left: 50%;
+  transform: translateX(-50%); display: flex; gap: 6px; z-index: 13; pointer-events: auto;
+}
+.slot {
+  width: 52px; height: 52px; border-radius: 10px;
+  background: #00000055; border: 2px solid #ffffff33;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  position: relative; cursor: pointer;
+}
+.slot.active { border-color: #fff; background: #ffffff33; transform: scale(1.06); }
+.slot .swatch { width: 30px; height: 30px; border-radius: 6px; border: 1px solid #0004; }
+.slot .name { position: absolute; bottom: 2px; font-size: 8px; opacity: .8; white-space: nowrap; }
+.slot .key { position: absolute; top: 2px; left: 4px; font-size: 9px; opacity: .6; }
+
+#toast {
+  position: fixed; top: 22%; left: 50%; transform: translateX(-50%);
+  z-index: 20; pointer-events: none; display: flex; flex-direction: column; gap: 8px; align-items: center;
+}
+.toast-item {
+  background: #222224ee; border: 2px solid #ffcb05; border-radius: 12px;
+  padding: 10px 18px; font-weight: 600; text-align: center;
+  animation: pop .3s ease, fade .5s ease 1.8s forwards;
+  box-shadow: 0 6px 20px #0006;
+}
+.toast-item small { display: block; font-weight: 400; opacity: .8; font-size: .75rem; }
+@keyframes pop { from { transform: scale(.7); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+@keyframes fade { to { opacity: 0; transform: translateY(-10px); } }
+
+/* ---------- Touch UI ---------- */
+#joystick {
+  position: fixed; bottom: calc(env(safe-area-inset-bottom) + 70px); left: 24px;
+  width: 130px; height: 130px; border-radius: 50%;
+  background: #ffffff1a; border: 2px solid #ffffff33; z-index: 14; touch-action: none;
+}
+#stick {
+  position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+  width: 56px; height: 56px; border-radius: 50%;
+  background: #ffffff55; border: 2px solid #ffffff88;
+}
+#action-buttons {
+  position: fixed; bottom: calc(env(safe-area-inset-bottom) + 70px); right: 20px;
+  display: grid; grid-template-columns: 64px 64px; grid-template-rows: 64px 64px; gap: 10px;
+  z-index: 14;
+}
+.abtn {
+  width: 64px; height: 64px; border-radius: 50%; font-size: 26px; color: #fff;
+  background: #ffffff22; border: 2px solid #ffffff55; touch-action: none;
+}
+.abtn:active { background: #ffffff44; }
+#btn-jump { grid-column: 2; grid-row: 1; }
+#btn-place { grid-column: 1; grid-row: 2; }
+#btn-break { grid-column: 2; grid-row: 2; }
+.minibtn {
+  position: fixed; right: 20px; top: calc(env(safe-area-inset-top) + 50px);
+  z-index: 14; background: #ffffff22; border: 2px solid #ffffff55; color: #fff;
+  border-radius: 10px; padding: 8px 12px; font-size: 13px;
+}
+.minibtn.on { background: #ffcb05; color: #222224; }
+
+#desktop-hint {
+  position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%);
+  background: #00000066; padding: 8px 14px; border-radius: 10px; font-size: 12px;
+  z-index: 12; text-align: center;
+}
+
+</style>
+</head>
+<body>
+  <!-- Loading screen -->
+  <div id="loading">
+    <div class="pokeball-spin"></div>
+    <h1>PokéCraft</h1>
+    <p id="load-text">Generating your world…</p>
+  </div>
+
+  <!-- Start menu -->
+  <div id="menu" class="hidden">
+    <div class="menu-card">
+      <div class="pokeball-logo"></div>
+      <h1>PokéCraft</h1>
+      <p class="tag">A blocky world where every animal is a Pokémon and you're the Trainer.</p>
+      <button id="play-btn">▶ Play</button>
+      <div class="hint">
+        <strong>iPhone:</strong> left side = move, right side = look. Tap blocks to mine, hold to break faster.
+      </div>
+    </div>
+  </div>
+
+  <!-- Game canvas mount -->
+  <div id="game" class="hidden">
+    <canvas id="c"></canvas>
+
+    <!-- HUD -->
+    <div id="crosshair">+</div>
+
+    <div id="topbar">
+      <div id="health"></div>
+      <div id="coords">x:0 y:0 z:0</div>
+    </div>
+
+    <!-- Hotbar -->
+    <div id="hotbar"></div>
+
+    <!-- Pokédex / catch toast -->
+    <div id="toast"></div>
+
+    <!-- Touch controls -->
+    <div id="touch-ui" class="hidden">
+      <div id="joystick">
+        <div id="stick"></div>
+      </div>
+      <div id="action-buttons">
+        <button id="btn-jump" class="abtn">⤴</button>
+        <button id="btn-place" class="abtn">▣</button>
+        <button id="btn-break" class="abtn">⛏</button>
+      </div>
+      <button id="btn-fly" class="minibtn">✈ Fly</button>
+    </div>
+
+    <!-- Desktop hint -->
+    <div id="desktop-hint">Click to play · WASD move · Space jump · Left-click mine · Right-click place · 1-9 select · F fly</div>
+  </div>
+
+  <script>
+// =============================================================
+// PokéCraft — a tiny Minecraft-style voxel sandbox, Pokémon mode
+// Pure WebGL, zero external dependencies. Plays on iPhone & desktop.
+// =============================================================
+
+// ---------- tiny mat4 / vec helpers ----------
+const Mat = {
+  perspective(fovy, aspect, near, far) {
+    const f = 1 / Math.tan(fovy / 2), nf = 1 / (near - far);
+    return [f / aspect, 0, 0, 0, 0, f, 0, 0, 0, 0, (far + near) * nf, -1, 0, 0, 2 * far * near * nf, 0];
+  },
+  lookAt(ex, ey, ez, cx, cy, cz, ux, uy, uz) {
+    let zx = ex - cx, zy = ey - cy, zz = ez - cz;
+    let zl = Math.hypot(zx, zy, zz) || 1; zx /= zl; zy /= zl; zz /= zl;
+    let xx = uy * zz - uz * zy, xy = uz * zx - ux * zz, xz = ux * zy - uy * zx;
+    let xl = Math.hypot(xx, xy, xz) || 1; xx /= xl; xy /= xl; xz /= xl;
+    let yx = zy * xz - zz * xy, yy = zz * xx - zx * xz, yz = zx * xy - zy * xx;
+    return [
+      xx, yx, zx, 0, xy, yy, zy, 0, xz, yz, zz, 0,
+      -(xx * ex + xy * ey + xz * ez), -(yx * ex + yy * ey + yz * ez), -(zx * ex + zy * ey + zz * ez), 1,
+    ];
+  },
+};
+
+// ---------- Block / item definitions (Pokémon themed) ----------
+const BLOCKS = {
+  grass:   { name: 'Leaf-Stone Grass', top: 0x6abe30, side: 0x7d5a3c, solid: true },
+  dirt:    { name: 'Soft Soil',        top: 0x7d5a3c, side: 0x7d5a3c, solid: true },
+  stone:   { name: 'Hard Rock',        top: 0x8a8a8a, side: 0x8a8a8a, solid: true },
+  sand:    { name: 'Route Sand',       top: 0xe6d59a, side: 0xe6d59a, solid: true },
+  water:   { name: 'Water (HM03)',     top: 0x3f7be0, side: 0x3f7be0, solid: false, alpha: 0.72 },
+  wood:    { name: 'Berry Log',        top: 0x9c6b3f, side: 0x6e4a2b, solid: true },
+  leaves:  { name: 'Berry Leaves',     top: 0x3fae45, side: 0x3fae45, solid: true, alpha: 0.95 },
+  pokeore: { name: 'Thunder Stone Ore',top: 0xffe14d, side: 0x8a8a8a, solid: true },
+  fire:    { name: 'Fire Stone Block',  top: 0xff5b3c, side: 0xd23b1f, solid: true },
+  water_s: { name: 'Water Stone Block', top: 0x49b6ff, side: 0x2f8fe0, solid: true },
+  potion:  { name: 'Potion Brick',      top: 0xff6fae, side: 0xd24f8e, solid: true },
+};
+const BLOCK_IDS = Object.keys(BLOCKS);
+const ID = {}; BLOCK_IDS.forEach((k, i) => ID[k] = i + 1); // 0 = air
+
+const HOTBAR = [
+  { block: 'grass' }, { block: 'dirt' }, { block: 'stone' }, { block: 'sand' },
+  { block: 'wood' }, { block: 'leaves' }, { block: 'fire' }, { block: 'water_s' }, { block: 'potion' },
+];
+
+// ---------- World config + storage ----------
+const WORLD = { size: 64, height: 32, water: 8 };
+const voxels = new Int8Array(WORLD.size * WORLD.height * WORLD.size);
+const vIndex = (x, y, z) => (y * WORLD.size + z) * WORLD.size + x;
+const inBounds = (x, y, z) => x >= 0 && x < WORLD.size && y >= 0 && y < WORLD.height && z >= 0 && z < WORLD.size;
+function getVoxel(x, y, z) { return inBounds(x, y, z) ? voxels[vIndex(x, y, z)] : 0; }
+function setVoxel(x, y, z, v) { if (inBounds(x, y, z)) voxels[vIndex(x, y, z)] = v; }
+
+// ---------- value-noise terrain ----------
+function makeNoise(seed) {
+  let s = seed;
+  const rand = () => { s = (s * 16807) % 2147483647; return (s % 1000) / 1000; };
+  const grid = {};
+  const corner = (ix, iz) => { const k = ix + ',' + iz; if (grid[k] === undefined) grid[k] = rand(); return grid[k]; };
+  const lerp = (a, b, t) => a + (b - a) * (t * t * (3 - 2 * t));
+  return (x, z) => {
+    const ix = Math.floor(x), iz = Math.floor(z), fx = x - ix, fz = z - iz;
+    const a = corner(ix, iz), b = corner(ix + 1, iz), c = corner(ix, iz + 1), d = corner(ix + 1, iz + 1);
+    return lerp(lerp(a, b, fx), lerp(c, d, fx), fz);
+  };
+}
+
+function generateWorld() {
+  const n1 = makeNoise(1337), n2 = makeNoise(99);
+  for (let x = 0; x < WORLD.size; x++)
+    for (let z = 0; z < WORLD.size; z++) {
+      const h = WORLD.water + Math.floor(n1(x / 16, z / 16) * 12) + Math.floor(n2(x / 7, z / 7) * 4);
+      for (let y = 0; y <= h; y++) {
+        let b = ID.stone;
+        if (y === h) b = (h <= WORLD.water + 1) ? ID.sand : ID.grass;
+        else if (y > h - 3) b = ID.dirt;
+        else if (n2(x / 3 + y, z / 3) > 0.82) b = ID.pokeore;
+        setVoxel(x, y, z, b);
+      }
+      for (let y = h + 1; y <= WORLD.water; y++) setVoxel(x, y, z, ID.water);
+      if (h > WORLD.water + 1 && Math.random() < 0.02) plantTree(x, h + 1, z);
+    }
+}
+
+function plantTree(x, y, z) {
+  const trunk = 4 + Math.floor(Math.random() * 2);
+  for (let i = 0; i < trunk; i++) setVoxel(x, y + i, z, ID.wood);
+  const top = y + trunk;
+  for (let dx = -2; dx <= 2; dx++)
+    for (let dz = -2; dz <= 2; dz++)
+      for (let dy = -1; dy <= 1; dy++) {
+        if (Math.abs(dx) + Math.abs(dz) + Math.abs(dy) > 3) continue;
+        if (getVoxel(x + dx, top + dy, z + dz) === 0) setVoxel(x + dx, top + dy, z + dz, ID.leaves);
+      }
+}
+
+// ---------- geometry helpers ----------
+const FACES = [
+  { dir: [1, 0, 0], corners: [[1, 0, 0], [1, 1, 0], [1, 1, 1], [1, 0, 1]], shade: 0.8 },
+  { dir: [-1, 0, 0], corners: [[0, 0, 1], [0, 1, 1], [0, 1, 0], [0, 0, 0]], shade: 0.8 },
+  { dir: [0, 1, 0], corners: [[0, 1, 1], [1, 1, 1], [1, 1, 0], [0, 1, 0]], shade: 1.0 },
+  { dir: [0, -1, 0], corners: [[0, 0, 0], [1, 0, 0], [1, 0, 1], [0, 0, 1]], shade: 0.55 },
+  { dir: [0, 0, 1], corners: [[1, 0, 1], [1, 1, 1], [0, 1, 1], [0, 0, 1]], shade: 0.9 },
+  { dir: [0, 0, -1], corners: [[0, 0, 0], [0, 1, 0], [1, 1, 0], [1, 0, 0]], shade: 0.7 },
+];
+const hexRGB = (hex) => [((hex >> 16) & 255) / 255, ((hex >> 8) & 255) / 255, (hex & 255) / 255];
+
+// build interleaved [x,y,z, r,g,b] vertex arrays for world
+function buildWorldGeometry() {
+  const opaque = [], trans = [];
+  for (let y = 0; y < WORLD.height; y++)
+    for (let z = 0; z < WORLD.size; z++)
+      for (let x = 0; x < WORLD.size; x++) {
+        const v = getVoxel(x, y, z);
+        if (v === 0) continue;
+        const def = BLOCKS[BLOCK_IDS[v - 1]];
+        const arr = def.alpha ? trans : opaque;
+        for (let f = 0; f < 6; f++) {
+          const F = FACES[f], d = F.dir;
+          const nb = getVoxel(x + d[0], y + d[1], z + d[2]);
+          const nbDef = nb ? BLOCKS[BLOCK_IDS[nb - 1]] : null;
+          if (nb !== 0 && (!nbDef.alpha || nb === v)) continue;
+          const base = (f === 2) ? def.top : def.side;
+          const [r, g, b] = hexRGB(base), sh = F.shade;
+          const c = F.corners;
+          // two triangles: 0,1,2  0,2,3
+          for (const ci of [0, 1, 2, 0, 2, 3]) {
+            arr.push(x + c[ci][0], y + c[ci][1], z + c[ci][2], r * sh, g * sh, b * sh);
+          }
+        }
+      }
+  return { opaque: new Float32Array(opaque), trans: new Float32Array(trans) };
+}
+
+// =============================================================
+// Pokémon mobs (sheep->Wooloo, pig->Tepig, + Pikachu)
+// Each mob = array of boxes {x,y,z (offset), w,h,d, c}
+// =============================================================
+const MOB_PARTS = {
+  wooloo: [
+    { w: 1.0, h: 0.9, d: 1.3, x: 0, y: 0.8, z: 0, c: 0xf3f0e7 },
+    { w: 0.55, h: 0.55, d: 0.5, x: 0, y: 0.95, z: 0.75, c: 0x6b4a36 },
+    { w: 0.18, h: 0.5, d: 0.18, x: -0.3, y: 0.25, z: 0.4, c: 0x4a3526 },
+    { w: 0.18, h: 0.5, d: 0.18, x: 0.3, y: 0.25, z: 0.4, c: 0x4a3526 },
+    { w: 0.18, h: 0.5, d: 0.18, x: -0.3, y: 0.25, z: -0.4, c: 0x4a3526 },
+    { w: 0.18, h: 0.5, d: 0.18, x: 0.3, y: 0.25, z: -0.4, c: 0x4a3526 },
+  ],
+  tepig: [
+    { w: 1.0, h: 0.85, d: 1.2, x: 0, y: 0.7, z: 0, c: 0xe8542f },
+    { w: 0.7, h: 0.7, d: 0.6, x: 0, y: 0.85, z: 0.7, c: 0x2b2b2b },
+    { w: 0.3, h: 0.25, d: 0.1, x: 0, y: 0.8, z: 1.05, c: 0xf2b04a },
+    { w: 0.18, h: 0.4, d: 0.18, x: -0.3, y: 0.2, z: 0.4, c: 0x2b2b2b },
+    { w: 0.18, h: 0.4, d: 0.18, x: 0.3, y: 0.2, z: 0.4, c: 0x2b2b2b },
+    { w: 0.18, h: 0.4, d: 0.18, x: -0.3, y: 0.2, z: -0.4, c: 0x2b2b2b },
+    { w: 0.18, h: 0.4, d: 0.18, x: 0.3, y: 0.2, z: -0.4, c: 0x2b2b2b },
+  ],
+  pikachu: [
+    { w: 0.8, h: 0.9, d: 1.0, x: 0, y: 0.7, z: 0, c: 0xffe14d },
+    { w: 0.7, h: 0.7, d: 0.5, x: 0, y: 1.05, z: 0.45, c: 0xffe14d },
+    { w: 0.16, h: 0.5, d: 0.12, x: -0.22, y: 1.55, z: 0.25, c: 0x222224 },
+    { w: 0.16, h: 0.5, d: 0.12, x: 0.22, y: 1.55, z: 0.25, c: 0x222224 },
+    { w: 0.2, h: 0.2, d: 0.08, x: -0.28, y: 0.98, z: 0.72, c: 0xff5b5b },
+    { w: 0.2, h: 0.2, d: 0.08, x: 0.28, y: 0.98, z: 0.72, c: 0xff5b5b },
+    { w: 0.18, h: 0.35, d: 0.18, x: -0.22, y: 0.2, z: 0.2, c: 0xd9a800 },
+    { w: 0.18, h: 0.35, d: 0.18, x: 0.22, y: 0.2, z: 0.2, c: 0xd9a800 },
+  ],
+};
+const MOB_KEYS = Object.keys(MOB_PARTS);
+const MOB_LABEL = { wooloo: 'Wooloo', tepig: 'Tepig', pikachu: 'Pikachu' };
+const mobs = [];
+
+function columnTop(x, z) {
+  for (let y = WORLD.height - 1; y >= 0; y--) {
+    const v = getVoxel(x, y, z);
+    if (v !== 0 && !BLOCKS[BLOCK_IDS[v - 1]].alpha) return y;
+  }
+  return WORLD.water;
+}
+
+function spawnMobs(count) {
+  for (let i = 0; i < count; i++) {
+    const type = MOB_KEYS[Math.floor(Math.random() * MOB_KEYS.length)];
+    const x = 4 + Math.random() * (WORLD.size - 8);
+    const z = 4 + Math.random() * (WORLD.size - 8);
+    const y = columnTop(Math.floor(x), Math.floor(z)) + 1;
+    mobs.push({ type, x, y, z, yaw: Math.random() * 6.28, vx: 0, vz: 0, timer: 0, caught: false });
+  }
+}
+
+function updateMobs(dt) {
+  for (const m of mobs) {
+    if (m.caught) continue;
+    m.timer -= dt;
+    if (m.timer <= 0) {
+      m.timer = 1 + Math.random() * 3;
+      m.yaw = Math.random() * Math.PI * 2;
+      const sp = 0.6;
+      m.vx = Math.cos(m.yaw) * sp; m.vz = Math.sin(m.yaw) * sp;
+    }
+    const nx = m.x + m.vx * dt, nz = m.z + m.vz * dt;
+    if (nx > 1 && nx < WORLD.size - 1 && nz > 1 && nz < WORLD.size - 1) {
+      m.x = nx; m.z = nz; m.y = columnTop(Math.floor(nx), Math.floor(nz)) + 1;
+    } else m.timer = 0;
+  }
+}
+
+// build mob geometry each frame into interleaved array
+function buildMobGeometry() {
+  const arr = [];
+  const S = 0.85;
+  for (const m of mobs) {
+    if (m.caught) continue;
+    const cy = Math.cos(m.yaw), sy = Math.sin(m.yaw);
+    const bob = Math.sin(performance.now() / 220 + m.x) * 0.03;
+    for (const p of MOB_PARTS[m.type]) {
+      const [r, g, b] = hexRGB(p.c);
+      const hx = p.w / 2, hy = p.h / 2, hz = p.d / 2;
+      for (let f = 0; f < 6; f++) {
+        const F = FACES[f], sh = F.shade, c = F.corners;
+        for (const ci of [0, 1, 2, 0, 2, 3]) {
+          // local part vertex
+          const lx = (p.x - hx) + c[ci][0] * p.w;
+          const ly = (p.y - hy) + c[ci][1] * p.h;
+          const lz = (p.z - hz) + c[ci][2] * p.d;
+          // rotate around Y, scale, translate to mob world pos
+          const rx = lx * cy - lz * sy;
+          const rz = lx * sy + lz * cy;
+          arr.push(m.x + rx * S, m.y + ly * S + bob, m.z + rz * S, r * sh, g * sh, b * sh);
+        }
+      }
+    }
+  }
+  return new Float32Array(arr);
+}
+
+// =============================================================
+// Player + controls
+// =============================================================
+const player = {
+  x: WORLD.size / 2, y: WORLD.height, z: WORLD.size / 2,
+  vx: 0, vy: 0, vz: 0,
+  yaw: 0, pitch: 0, onGround: false, fly: false,
+  height: 1.6, radius: 0.3, health: 10, selected: 0, caught: 0,
+};
+const input = { f: 0, b: 0, l: 0, r: 0, jump: false, crouch: false };
+const GRAV = 24, SPEED = 5.2, FLYSPEED = 9, JUMP = 8.5;
+
+function spawnPlayer() {
+  const cx = Math.floor(WORLD.size / 2), cz = Math.floor(WORLD.size / 2);
+  player.x = cx + 0.5; player.y = columnTop(cx, cz) + 2.5; player.z = cz + 0.5;
+  player.vx = player.vy = player.vz = 0;
+}
+
+function lookDir() {
+  return [
+    -Math.sin(player.yaw) * Math.cos(player.pitch),
+    Math.sin(player.pitch),
+    -Math.cos(player.yaw) * Math.cos(player.pitch),
+  ];
+}
+
+// DDA-ish raycast through voxels
+function raycastVoxel(maxDist = 6) {
+  const [dx, dy, dz] = lookDir();
+  const ox = player.x, oy = player.y, oz = player.z; // eye at player.y
+  let t = 0; const step = 0.05;
+  let ix = Math.floor(ox), iy = Math.floor(oy), iz = Math.floor(oz);
+  let prev = [ix, iy, iz];
+  while (t < maxDist) {
+    t += step;
+    const cx = Math.floor(ox + dx * t), cy = Math.floor(oy + dy * t), cz = Math.floor(oz + dz * t);
+    if (cx === ix && cy === iy && cz === iz) continue;
+    prev = [ix, iy, iz]; ix = cx; iy = cy; iz = cz;
+    const v = getVoxel(ix, iy, iz);
+    if (v !== 0 && !BLOCKS[BLOCK_IDS[v - 1]].alpha) return { hit: [ix, iy, iz], place: prev };
+  }
+  return null;
+}
+
+function mineBlock() {
+  const r = raycastVoxel(); if (!r) return;
+  const [x, y, z] = r.hit, v = getVoxel(x, y, z);
+  if (v === 0) return;
+  setVoxel(x, y, z, 0); worldDirty = true;
+  showToast('⛏ Mined ' + BLOCKS[BLOCK_IDS[v - 1]].name);
+}
+
+function placeBlock() {
+  const r = raycastVoxel(); if (!r) return;
+  const [x, y, z] = r.place;
+  if (getVoxel(x, y, z) !== 0) return;
+  const feet = player.y - player.height;
+  if (x === Math.floor(player.x) && z === Math.floor(player.z) &&
+      y >= Math.floor(feet) && y <= Math.floor(player.y)) return;
+  setVoxel(x, y, z, ID[HOTBAR[player.selected].block]); worldDirty = true;
+}
+
+function throwPokeball() {
+  const [dx, dy, dz] = lookDir();
+  let best = null, bestDot = 0.4;
+  for (const m of mobs) {
+    if (m.caught) continue;
+    let tx = m.x - player.x, ty = (m.y + 0.6) - player.y, tz = m.z - player.z;
+    const dist = Math.hypot(tx, ty, tz);
+    if (dist > 9) continue;
+    tx /= dist; ty /= dist; tz /= dist;
+    const dot = tx * dx + ty * dy + tz * dz;
+    if (dot > bestDot) { bestDot = dot; best = m; }
+  }
+  if (best) {
+    best.caught = true; player.caught++;
+    showToast('🔴 Gotcha! ' + MOB_LABEL[best.type] + ' was caught!', 'Pokédex: ' + player.caught + ' caught');
+  } else showToast('🔴 …the ball missed!');
+}
+
+// ---------- physics ----------
+function solidAt(x, y, z) {
+  const v = getVoxel(Math.floor(x), Math.floor(y), Math.floor(z));
+  return v !== 0 && BLOCKS[BLOCK_IDS[v - 1]].solid;
+}
+
+function collide(axis, amount) {
+  const r = player.radius;
+  player[axis] += amount;
+  const yBottom = player.y - player.height, yTop = player.y;
+  for (let bx = Math.floor(player.x - r); bx <= Math.floor(player.x + r); bx++)
+    for (let bz = Math.floor(player.z - r); bz <= Math.floor(player.z + r); bz++)
+      for (let by = Math.floor(yBottom); by <= Math.floor(yTop); by++) {
+        if (!solidAt(bx, by, bz)) continue;
+        if (axis === 'x') { player.x = amount > 0 ? bx - r - 0.001 : bx + 1 + r + 0.001; player.vx = 0; }
+        else if (axis === 'z') { player.z = amount > 0 ? bz - r - 0.001 : bz + 1 + r + 0.001; player.vz = 0; }
+        else {
+          if (amount > 0) { player.y = by - 0.001; player.vy = 0; }
+          else { player.y = by + 1 + player.height + 0.001; player.vy = 0; player.onGround = true; }
+        }
+        return;
+      }
+}
+
+function updatePlayer(dt) {
+  const sp = player.fly ? FLYSPEED : SPEED;
+  const fwd = [-Math.sin(player.yaw), -Math.cos(player.yaw)];
+  const rgt = [Math.cos(player.yaw), -Math.sin(player.yaw)];
+  let mx = fwd[0] * (input.f - input.b) + rgt[0] * (input.r - input.l);
+  let mz = fwd[1] * (input.f - input.b) + rgt[1] * (input.r - input.l);
+  const ml = Math.hypot(mx, mz);
+  if (ml > 0) { mx /= ml; mz /= ml; }
+
+  player.vx = mx * sp; player.vz = mz * sp;
+  if (player.fly) {
+    player.vy = input.jump ? sp : (input.crouch ? -sp : player.vy * 0.8);
+  } else {
+    player.vy -= GRAV * dt;
+    if (input.jump && player.onGround) { player.vy = JUMP; player.onGround = false; }
+  }
+  player.onGround = false;
+  collide('x', player.vx * dt);
+  collide('z', player.vz * dt);
+  collide('y', player.vy * dt);
+  if (player.y < -10) spawnPlayer();
+}
+
+// =============================================================
+// WebGL renderer
+// =============================================================
+let gl, prog, uProj, uView, uAlpha, uFog, uNear, uFar, aPos, aColor;
+let bufOpaque, bufTrans, bufMob, cntOpaque = 0, cntTrans = 0;
+let worldDirty = true;
+const SKY = hexRGB(0x7ec0ee);
+
+const VS = `
+attribute vec3 aPos; attribute vec3 aColor;
+uniform mat4 uProj; uniform mat4 uView;
+varying vec3 vColor; varying float vDist;
+void main(){
+  vec4 vp = uView * vec4(aPos, 1.0);
+  vDist = -vp.z;
+  vColor = aColor;
+  gl_Position = uProj * vp;
+}`;
+const FS = `
+precision mediump float;
+varying vec3 vColor; varying float vDist;
+uniform vec3 uFog; uniform float uNear; uniform float uFar; uniform float uAlpha;
+void main(){
+  float f = clamp((vDist - uNear) / (uFar - uNear), 0.0, 1.0);
+  gl_FragColor = vec4(mix(vColor, uFog, f), uAlpha);
+}`;
+
+function compile(type, src) {
+  const s = gl.createShader(type);
+  gl.shaderSource(s, src); gl.compileShader(s);
+  if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(s));
+  return s;
+}
+
+function initGL() {
+  const canvas = document.getElementById('c');
+  gl = canvas.getContext('webgl', { antialias: false }) || canvas.getContext('experimental-webgl');
+  if (!gl) { alert('WebGL not supported on this device.'); return false; }
+  prog = gl.createProgram();
+  gl.attachShader(prog, compile(gl.VERTEX_SHADER, VS));
+  gl.attachShader(prog, compile(gl.FRAGMENT_SHADER, FS));
+  gl.linkProgram(prog);
+  if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(prog));
+  gl.useProgram(prog);
+  aPos = gl.getAttribLocation(prog, 'aPos');
+  aColor = gl.getAttribLocation(prog, 'aColor');
+  uProj = gl.getUniformLocation(prog, 'uProj');
+  uView = gl.getUniformLocation(prog, 'uView');
+  uAlpha = gl.getUniformLocation(prog, 'uAlpha');
+  uFog = gl.getUniformLocation(prog, 'uFog');
+  uNear = gl.getUniformLocation(prog, 'uNear');
+  uFar = gl.getUniformLocation(prog, 'uFar');
+  bufOpaque = gl.createBuffer(); bufTrans = gl.createBuffer(); bufMob = gl.createBuffer();
+  gl.enable(gl.DEPTH_TEST);
+  gl.enable(gl.CULL_FACE); gl.cullFace(gl.BACK);
+  gl.clearColor(SKY[0], SKY[1], SKY[2], 1);
+  resize();
+  window.addEventListener('resize', resize);
+  return true;
+}
+
+function resize() {
+  const canvas = document.getElementById('c');
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  canvas.width = Math.floor(window.innerWidth * dpr);
+  canvas.height = Math.floor(window.innerHeight * dpr);
+  canvas.style.width = window.innerWidth + 'px';
+  canvas.style.height = window.innerHeight + 'px';
+  gl.viewport(0, 0, canvas.width, canvas.height);
+}
+
+function uploadWorld() {
+  const { opaque, trans } = buildWorldGeometry();
+  gl.bindBuffer(gl.ARRAY_BUFFER, bufOpaque);
+  gl.bufferData(gl.ARRAY_BUFFER, opaque, gl.STATIC_DRAW);
+  cntOpaque = opaque.length / 6;
+  gl.bindBuffer(gl.ARRAY_BUFFER, bufTrans);
+  gl.bufferData(gl.ARRAY_BUFFER, trans, gl.STATIC_DRAW);
+  cntTrans = trans.length / 6;
+  worldDirty = false;
+}
+
+function bindAttribs() {
+  const stride = 24; // 6 floats
+  gl.enableVertexAttribArray(aPos);
+  gl.vertexAttribPointer(aPos, 3, gl.FLOAT, false, stride, 0);
+  gl.enableVertexAttribArray(aColor);
+  gl.vertexAttribPointer(aColor, 3, gl.FLOAT, false, stride, 12);
+}
+
+function render() {
+  const canvas = document.getElementById('c');
+  const proj = Mat.perspective(75 * Math.PI / 180, canvas.width / canvas.height, 0.1, 200);
+  const [dx, dy, dz] = lookDir();
+  const view = Mat.lookAt(player.x, player.y, player.z, player.x + dx, player.y + dy, player.z + dz, 0, 1, 0);
+
+  gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+  gl.uniformMatrix4fv(uProj, false, proj);
+  gl.uniformMatrix4fv(uView, false, view);
+  gl.uniform3fv(uFog, SKY);
+  gl.uniform1f(uNear, 30); gl.uniform1f(uFar, 70);
+
+  // opaque world
+  gl.disable(gl.BLEND);
+  gl.depthMask(true);
+  gl.uniform1f(uAlpha, 1.0);
+  gl.bindBuffer(gl.ARRAY_BUFFER, bufOpaque); bindAttribs();
+  gl.drawArrays(gl.TRIANGLES, 0, cntOpaque);
+
+  // mobs (opaque) — rebuild every frame
+  const mobData = buildMobGeometry();
+  if (mobData.length) {
+    gl.bindBuffer(gl.ARRAY_BUFFER, bufMob);
+    gl.bufferData(gl.ARRAY_BUFFER, mobData, gl.DYNAMIC_DRAW);
+    bindAttribs();
+    gl.drawArrays(gl.TRIANGLES, 0, mobData.length / 6);
+  }
+
+  // transparent (water + leaves)
+  gl.enable(gl.BLEND);
+  gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+  gl.depthMask(false);
+  gl.uniform1f(uAlpha, 0.78);
+  gl.bindBuffer(gl.ARRAY_BUFFER, bufTrans); bindAttribs();
+  gl.drawArrays(gl.TRIANGLES, 0, cntTrans);
+  gl.depthMask(true);
+}
+
+// =============================================================
+// HUD
+// =============================================================
+function buildHotbar() {
+  const bar = document.getElementById('hotbar'); bar.innerHTML = '';
+  HOTBAR.forEach((slot, i) => {
+    const def = BLOCKS[slot.block];
+    const el = document.createElement('div');
+    el.className = 'slot' + (i === player.selected ? ' active' : '');
+    el.innerHTML = `<span class="key">${i + 1}</span>` +
+      `<div class="swatch" style="background:#${def.top.toString(16).padStart(6, '0')}"></div>` +
+      `<span class="name">${def.name.split(' ')[0]}</span>`;
+    el.onclick = () => selectSlot(i);
+    bar.appendChild(el);
+  });
+}
+function selectSlot(i) {
+  player.selected = i;
+  document.querySelectorAll('.slot').forEach((s, n) => s.classList.toggle('active', n === i));
+}
+function updateHealth() {
+  let s = '';
+  for (let i = 0; i < 10; i++) s += i < player.health ? '❤️' : '🖤';
+  document.getElementById('health').textContent = s;
+}
+function updateCoords() {
+  document.getElementById('coords').textContent =
+    `x:${player.x.toFixed(0)} y:${player.y.toFixed(0)} z:${player.z.toFixed(0)} · 🔴${player.caught}`;
+}
+function showToast(text, sub) {
+  const t = document.getElementById('toast');
+  const el = document.createElement('div');
+  el.className = 'toast-item';
+  el.innerHTML = text + (sub ? `<small>${sub}</small>` : '');
+  t.appendChild(el);
+  setTimeout(() => el.remove(), 2400);
+}
+
+// =============================================================
+// main loop
+// =============================================================
+let last = performance.now();
+function loop() {
+  requestAnimationFrame(loop);
+  const now = performance.now();
+  let dt = (now - last) / 1000; last = now;
+  if (dt > 0.1) dt = 0.1;
+  updatePlayer(dt);
+  updateMobs(dt);
+  if (worldDirty) uploadWorld();
+  render();
+  updateCoords();
+}
+
+// =============================================================
+// input wiring
+// =============================================================
+const isTouch = ('ontouchstart' in window) || navigator.maxTouchPoints > 0;
+
+function toggleFly() {
+  player.fly = !player.fly; player.vx = player.vy = player.vz = 0;
+  const btn = document.getElementById('btn-fly');
+  if (btn) btn.classList.toggle('on', player.fly);
+  showToast(player.fly ? '✈ Fly mode ON' : '🚶 Fly mode OFF');
+}
+
+function setupKeyboard() {
+  const km = { KeyW: 'f', KeyS: 'b', KeyA: 'l', KeyD: 'r' };
+  document.addEventListener('keydown', (e) => {
+    if (km[e.code]) input[km[e.code]] = 1;
+    if (e.code === 'Space') { input.jump = true; e.preventDefault(); }
+    if (e.code === 'ShiftLeft') input.crouch = true;
+    if (e.code === 'KeyF') toggleFly();
+    if (e.code === 'KeyQ') throwPokeball();
+    if (e.code.startsWith('Digit')) { const n = +e.code.slice(5); if (n >= 1 && n <= 9) selectSlot(n - 1); }
+  });
+  document.addEventListener('keyup', (e) => {
+    if (km[e.code]) input[km[e.code]] = 0;
+    if (e.code === 'Space') input.jump = false;
+    if (e.code === 'ShiftLeft') input.crouch = false;
+  });
+}
+
+function setupMouse() {
+  const canvas = document.getElementById('c');
+  canvas.addEventListener('click', () => { if (document.pointerLockElement !== canvas) canvas.requestPointerLock(); });
+  document.addEventListener('mousemove', (e) => {
+    if (document.pointerLockElement !== canvas) return;
+    player.yaw -= e.movementX * 0.0025;
+    player.pitch -= e.movementY * 0.0025;
+    player.pitch = Math.max(-1.5, Math.min(1.5, player.pitch));
+  });
+  canvas.addEventListener('mousedown', (e) => {
+    if (document.pointerLockElement !== canvas) return;
+    if (e.button === 0) mineBlock();
+    if (e.button === 2) placeBlock();
+  });
+  canvas.addEventListener('contextmenu', (e) => e.preventDefault());
+  canvas.addEventListener('auxclick', (e) => { if (e.button === 1) throwPokeball(); });
+}
+
+function setupTouch() {
+  document.getElementById('touch-ui').classList.remove('hidden');
+  document.getElementById('desktop-hint').classList.add('hidden');
+
+  const joy = document.getElementById('joystick'), stick = document.getElementById('stick');
+  let joyId = null, cx = 0, cy = 0;
+  const joyStart = (t) => { joyId = t.identifier; const r = joy.getBoundingClientRect(); cx = r.left + r.width / 2; cy = r.top + r.height / 2; };
+  const joyMove = (t) => {
+    let dx = t.clientX - cx, dy = t.clientY - cy;
+    const max = 50, d = Math.hypot(dx, dy);
+    if (d > max) { dx = dx / d * max; dy = dy / d * max; }
+    stick.style.transform = `translate(${dx - 28}px, ${dy - 28}px)`;
+    input.f = Math.max(0, -dy / max); input.b = Math.max(0, dy / max);
+    input.l = Math.max(0, -dx / max); input.r = Math.max(0, dx / max);
+  };
+  const joyEnd = () => { joyId = null; stick.style.transform = 'translate(-50%,-50%)'; input.f = input.b = input.l = input.r = 0; };
+  joy.addEventListener('touchstart', (e) => { e.preventDefault(); joyStart(e.changedTouches[0]); joyMove(e.changedTouches[0]); }, { passive: false });
+
+  let lookId = null, lastX = 0, lastY = 0;
+  const ignore = (t) => t.target.closest('#joystick') || t.target.closest('#action-buttons') || t.target.closest('#hotbar') || t.target.closest('.minibtn');
+
+  document.addEventListener('touchstart', (e) => {
+    for (const t of e.changedTouches) {
+      if (t.identifier === joyId || ignore(t)) continue;
+      if (lookId === null) { lookId = t.identifier; lastX = t.clientX; lastY = t.clientY; }
+    }
+  }, { passive: false });
+  document.addEventListener('touchmove', (e) => {
+    for (const t of e.changedTouches) {
+      if (t.identifier === joyId) { joyMove(t); e.preventDefault(); }
+      else if (t.identifier === lookId) {
+        player.yaw -= (t.clientX - lastX) * 0.005;
+        player.pitch -= (t.clientY - lastY) * 0.005;
+        player.pitch = Math.max(-1.5, Math.min(1.5, player.pitch));
+        lastX = t.clientX; lastY = t.clientY; e.preventDefault();
+      }
+    }
+  }, { passive: false });
+  document.addEventListener('touchend', (e) => {
+    for (const t of e.changedTouches) {
+      if (t.identifier === joyId) joyEnd();
+      if (t.identifier === lookId) lookId = null;
+    }
+  });
+
+  const jb = document.getElementById('btn-jump');
+  jb.addEventListener('touchstart', (e) => { e.preventDefault(); input.jump = true; });
+  jb.addEventListener('touchend', (e) => { e.preventDefault(); input.jump = false; });
+  document.getElementById('btn-break').addEventListener('touchstart', (e) => { e.preventDefault(); mineBlock(); });
+  document.getElementById('btn-place').addEventListener('touchstart', (e) => { e.preventDefault(); placeBlock(); });
+  document.getElementById('btn-fly').addEventListener('click', toggleFly);
+
+  let lastTap = 0;
+  document.addEventListener('touchend', (e) => {
+    const t = e.changedTouches[0];
+    if (ignore(t)) return;
+    const now = performance.now();
+    if (now - lastTap < 300) throwPokeball();
+    lastTap = now;
+  });
+}
+
+// =============================================================
+// boot
+// =============================================================
+function startGame() {
+  document.getElementById('menu').classList.add('hidden');
+  document.getElementById('game').classList.remove('hidden');
+  if (!initGL()) return;
+  spawnPlayer();
+  spawnMobs(18);
+  uploadWorld();
+  buildHotbar();
+  updateHealth();
+  setupKeyboard();
+  setupMouse();
+  if (isTouch) setupTouch();
+  else document.getElementById('desktop-hint').classList.remove('hidden');
+  loop();
+}
+
+function boot() {
+  generateWorld();
+  document.getElementById('loading').classList.add('hidden');
+  document.getElementById('menu').classList.remove('hidden');
+  document.getElementById('play-btn').addEventListener('click', startGame, { once: true });
+}
+
+requestAnimationFrame(() => requestAnimationFrame(boot));
+
+</script>
+</body>
+</html>
