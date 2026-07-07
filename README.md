@@ -1,3 +1,16 @@
+# 🌌 AstroCraft & 🔴 PokéCraft
+
+Two Minecraft-style voxel games in one repo — no build step, no dependencies, both play on iPhone:
+
+- **[`astrocraft.html`](astrocraft.html)** — ✨ NEW: a voxel island drifting through space. Fabulous graphics: a shader-painted nebula sky with twinkling stars, a ringed gas giant and a glowing sun, emissive crystal/plasma/star-ore blocks, per-vertex ambient occlusion, break particles, low gravity and a jetpack. Open it in Safari and tap **LAUNCH**.
+- **`index.html`** — PokéCraft, the original Pokémon-flavored voxel sandbox (docs below).
+
+## 🚀 AstroCraft quick guide
+
+Mine ⛏️ and build 🧱 on a floating asteroid island. Hold **jump in mid-air** to fire the jetpack (watch the 🚀 fuel bar), toggle 🛸 fly mode for creative building, and don't fall into the void — you'll respawn. 8 space blocks in the hotbar, and your edits **auto-save** in the browser. Same touch/desktop controls as PokéCraft below (🚀 button = fly toggle).
+
+---
+
 # 🔴 PokéCraft
 
 A blocky, Minecraft-style voxel sandbox running entirely in the browser — with a **Pokémon mode** baked in. You're the Trainer. Every animal is a Pokémon. The items are Pokémon-flavored. Built to play on an **iPhone** (or any phone / desktop).
