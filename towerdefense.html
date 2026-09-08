@@ -1,0 +1,1036 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<meta name="theme-color" content="#12161f" />
+<title>Creep Keep — Tower Defense</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%2312161f'/%3E%3Cpath d='M8 24V13l8-6 8 6v11z' fill='%23ffd166'/%3E%3Crect x='13' y='17' width='6' height='7' fill='%2312161f'/%3E%3C/svg%3E" />
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+:root {
+  --bg: #0e1219;
+  --panel: #182031;
+  --panel-2: #1f2941;
+  --line: #2c3855;
+  --ink: #e9edf6;
+  --muted: #93a0bb;
+  --gold: #ffd166;
+  --life: #ff6b7a;
+  --good: #6ee7a0;
+  --bad: #ff6b7a;
+}
+
+html, body {
+  height: 100%;
+  background: radial-gradient(circle at 50% 0%, #1a2233, #0b0e14 70%);
+  color: var(--ink);
+  font-family: ui-rounded, "Segoe UI", -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
+  overscroll-behavior: none;
+}
+body { display: flex; justify-content: center; padding: 10px; }
+.hidden { display: none !important; }
+
+#app {
+  width: 100%; max-width: 1200px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 268px;
+  grid-template-areas: "hud hud" "stage side";
+  gap: 10px;
+  align-content: start;
+}
+
+/* ---------- HUD ---------- */
+#hud {
+  grid-area: hud;
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
+  background: var(--panel); border: 1px solid var(--line); border-radius: 12px;
+  padding: 8px 12px;
+}
+.stat { display: flex; align-items: baseline; gap: 6px; font-variant-numeric: tabular-nums; }
+.stat .label { font-size: .72rem; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
+.stat .value { font-size: 1.15rem; font-weight: 700; }
+#lives-v { color: var(--life); }
+#gold-v { color: var(--gold); }
+.sep { width: 1px; height: 26px; background: var(--line); }
+#wave-info { color: var(--muted); font-size: .85rem; min-width: 160px; }
+#hud .spacer { flex: 1; }
+
+button {
+  font: inherit; color: var(--ink); cursor: pointer;
+  background: var(--panel-2); border: 1px solid var(--line);
+  border-radius: 9px; padding: 7px 12px;
+}
+button:hover:not(:disabled) { border-color: #4a5d8f; background: #263353; }
+button:disabled { opacity: .45; cursor: not-allowed; }
+button.primary { background: #2c6cf6; border-color: #5488ff; font-weight: 700; }
+button.primary:hover:not(:disabled) { background: #3d7bff; }
+
+/* ---------- Stage ---------- */
+#stage { grid-area: stage; position: relative; min-width: 0; }
+canvas {
+  display: block; width: 100%; height: auto; aspect-ratio: 22 / 14;
+  border: 1px solid var(--line); border-radius: 12px;
+  background: #253a2a; touch-action: manipulation;
+}
+#stage.shake canvas { animation: shake .28s; }
+@keyframes shake {
+  25% { transform: translate(-4px, 2px); }
+  50% { transform: translate(3px, -3px); }
+  75% { transform: translate(-2px, -1px); }
+}
+
+#overlay {
+  position: absolute; inset: 0; z-index: 5;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px;
+  text-align: center; padding: 20px; border-radius: 12px;
+  background: rgba(8, 11, 17, .86); backdrop-filter: blur(3px);
+}
+#ov-title { font-size: 2.2rem; letter-spacing: .5px; }
+#ov-sub { color: var(--muted); max-width: 460px; line-height: 1.5; }
+#ov-stats { display: flex; gap: 22px; flex-wrap: wrap; justify-content: center; }
+#ov-stats .s { font-size: .8rem; color: var(--muted); text-transform: uppercase; letter-spacing: .07em; }
+#ov-stats .s b { display: block; font-size: 1.5rem; color: var(--ink); letter-spacing: 0; }
+#ov-btn { font-size: 1.05rem; padding: 11px 26px; }
+
+/* ---------- Side panel ---------- */
+#side { grid-area: side; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.panel { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 10px; }
+.panel h2 {
+  font-size: .72rem; text-transform: uppercase; letter-spacing: .1em;
+  color: var(--muted); margin-bottom: 8px; font-weight: 700;
+}
+
+#shop { display: flex; flex-direction: column; gap: 7px; }
+.card {
+  display: grid; grid-template-columns: 34px 1fr auto; gap: 9px; align-items: center;
+  text-align: left; padding: 8px; width: 100%;
+}
+.card .swatch { width: 34px; height: 34px; border-radius: 8px; border: 2px solid #0b0e14; }
+.card .cname { display: block; font-weight: 700; font-size: .92rem; }
+.card .cdesc { display: block; font-size: .72rem; color: var(--muted); line-height: 1.3; margin-top: 2px; }
+.card .ccost { font-weight: 700; color: var(--gold); font-variant-numeric: tabular-nums; }
+.card.selected { border-color: var(--gold); box-shadow: inset 0 0 0 1px var(--gold); }
+.card.poor .ccost { color: var(--bad); }
+
+#insp-empty { font-size: .8rem; color: var(--muted); line-height: 1.5; }
+#it-name { font-size: 1rem; margin-bottom: 6px; }
+.statrow {
+  display: flex; justify-content: space-between; font-size: .8rem;
+  padding: 3px 0; border-bottom: 1px dashed #26314c;
+}
+.statrow span:last-child { font-variant-numeric: tabular-nums; font-weight: 600; }
+.pips { display: inline-flex; gap: 3px; vertical-align: middle; margin-left: 6px; }
+.pip { width: 8px; height: 8px; border-radius: 2px; background: #33405f; }
+.pip.on { background: var(--gold); }
+#insp-tower .actions { display: flex; flex-direction: column; gap: 6px; margin-top: 9px; }
+#insp-tower .actions button { text-align: left; font-size: .84rem; }
+.cost { float: right; color: var(--gold); font-weight: 700; }
+button:disabled .cost { color: var(--muted); }
+#it-sell { background: #3a2231; border-color: #5d3049; }
+
+#legend { font-size: .74rem; color: var(--muted); line-height: 1.6; }
+#legend b { color: var(--ink); }
+
+@media (max-width: 860px) {
+  #app { grid-template-columns: minmax(0, 1fr); grid-template-areas: "hud" "stage" "side"; }
+  #shop { display: grid; grid-template-columns: 1fr 1fr; }
+  #ov-title { font-size: 1.6rem; }
+}
+@media (max-width: 560px) {
+  #shop { grid-template-columns: 1fr; }
+  #wave-info { min-width: 100%; order: 9; }
+}
+</style>
+</head>
+<body>
+<div id="app">
+
+  <header id="hud">
+    <div class="stat"><span class="label">Lives</span><span class="value" id="lives-v">20</span></div>
+    <div class="sep"></div>
+    <div class="stat"><span class="label">Gold</span><span class="value" id="gold-v">0</span></div>
+    <div class="sep"></div>
+    <div class="stat"><span class="label">Wave</span><span class="value" id="wave-v">0/20</span></div>
+    <div class="sep"></div>
+    <div id="wave-info">Get ready…</div>
+    <div class="spacer"></div>
+    <button id="btn-send" class="primary">Send wave</button>
+    <button id="btn-speed">1&times;</button>
+    <button id="btn-pause">Pause</button>
+  </header>
+
+  <div id="stage">
+    <canvas id="c"></canvas>
+    <div id="overlay">
+      <h1 id="ov-title">Creep Keep</h1>
+      <p id="ov-sub"></p>
+      <div id="ov-stats"></div>
+      <button id="ov-btn" class="primary">Play</button>
+    </div>
+  </div>
+
+  <aside id="side">
+    <div class="panel">
+      <h2>Build</h2>
+      <div id="shop"></div>
+    </div>
+
+    <div class="panel" id="inspector">
+      <h2>Tower</h2>
+      <div id="insp-empty">
+        Pick a tower above, then tap a grass tile to build it.<br />
+        Tap a built tower to upgrade or sell it.
+      </div>
+      <div id="insp-tower" class="hidden">
+        <div id="it-name"></div>
+        <div id="it-stats"></div>
+        <div class="actions">
+          <button id="up-dmg"></button>
+          <button id="up-rate"></button>
+          <button id="it-target"></button>
+          <button id="it-sell"></button>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2>Keys</h2>
+      <div id="legend">
+        <b>1–4</b> pick tower &nbsp;·&nbsp; <b>Esc</b> cancel<br />
+        <b>Space</b> pause &nbsp;·&nbsp; <b>Enter</b> send wave &nbsp;·&nbsp; <b>F</b> fast-forward<br />
+        <b>U</b> upgrade damage &nbsp;·&nbsp; <b>I</b> upgrade fire rate &nbsp;·&nbsp; <b>X</b> sell
+      </div>
+    </div>
+  </aside>
+
+</div>
+
+<script>
+(() => {
+'use strict';
+
+/* ============================================================
+   Board geometry
+   ============================================================ */
+const TILE = 40, COLS = 22, ROWS = 14, W = COLS * TILE, H = ROWS * TILE;
+
+// Waypoints in grid coordinates; the first/last sit off-board so creeps
+// walk in from the left edge and exit on the right.
+const WAYPOINTS = [
+  [-1, 1], [5, 1], [5, 5], [1, 5], [1, 9], [9, 9],
+  [9, 3], [14, 3], [14, 11], [18, 11], [18, 6], [22, 6]
+];
+
+const pathCells = new Set();
+for (let i = 0; i < WAYPOINTS.length - 1; i++) {
+  const [c0, r0] = WAYPOINTS[i], [c1, r1] = WAYPOINTS[i + 1];
+  const dc = Math.sign(c1 - c0), dr = Math.sign(r1 - r0);
+  let c = c0, r = r0;
+  for (;;) {
+    if (c >= 0 && c < COLS && r >= 0 && r < ROWS) pathCells.add(c + ',' + r);
+    if (c === c1 && r === r1) break;
+    c += dc; r += dr;
+  }
+}
+
+const PATH = WAYPOINTS.map(([c, r]) => ({ x: c * TILE + TILE / 2, y: r * TILE + TILE / 2 }));
+const segLen = [], segStart = [];
+let PATH_LEN = 0;
+for (let i = 0; i < PATH.length - 1; i++) {
+  segStart.push(PATH_LEN);
+  const d = Math.hypot(PATH[i + 1].x - PATH[i].x, PATH[i + 1].y - PATH[i].y);
+  segLen.push(d);
+  PATH_LEN += d;
+}
+
+/* ============================================================
+   Content: towers, creeps, waves
+   ============================================================ */
+const TOWERS = {
+  arrow: {
+    key: 'arrow', name: 'Arrow Nest', cost: 70, range: 3.1, damage: 14, rate: 1.8,
+    kind: 'bullet', bulletSpeed: 470, color: '#8bd97a', accent: '#4f8f45',
+    desc: 'Cheap, quick single-target shots.'
+  },
+  cannon: {
+    key: 'cannon', name: 'Bombard', cost: 135, range: 2.7, damage: 36, rate: 0.62,
+    kind: 'bullet', bulletSpeed: 280, splash: 1.2, color: '#e8a95c', accent: '#96602a',
+    desc: 'Lobbed shells, splash damage.'
+  },
+  frost: {
+    key: 'frost', name: 'Frost Spire', cost: 110, range: 2.5, damage: 9, rate: 1.0,
+    kind: 'pulse', slow: 0.45, slowTime: 1.8, color: '#7fd8ef', accent: '#3d7f9c',
+    desc: 'Pulses: chills every creep in range.'
+  },
+  arcane: {
+    key: 'arcane', name: 'Arcane Beam', cost: 240, range: 5.4, damage: 95, rate: 0.5,
+    kind: 'beam', pierceArmor: true, color: '#c79bff', accent: '#6b45a8',
+    desc: 'Long reach, heavy hits, ignores armor.'
+  }
+};
+const TOWER_KEYS = Object.keys(TOWERS);
+
+const MAX_LVL = 4;                       // 4 upgrades per track on top of the base tier
+const DMG_STEP = 1.35, RATE_STEP = 1.2;  // per upgrade level
+const SELL_RATE = 0.65;
+
+const CREEPS = {
+  grunt:  { name: 'Grunt',   hp: 58,  speed: 56,  gold: 8,   armor: 0, r: 11, leak: 1, color: '#8fdc6a', accent: '#3f7a2c' },
+  runner: { name: 'Runner',  hp: 42,  speed: 112, gold: 9,   armor: 0, r: 9,  leak: 1, color: '#6fc9ff', accent: '#2b6e9c' },
+  wraith: { name: 'Wraith',  hp: 95,  speed: 78,  gold: 12,  armor: 2, r: 11, leak: 1, color: '#c79bff', accent: '#6a44a5' },
+  brute:  { name: 'Brute',   hp: 245, speed: 38,  gold: 24,  armor: 5, r: 15, leak: 2, color: '#e0685f', accent: '#8c332c' },
+  boss:   { name: 'Warlord', hp: 900, speed: 32,  gold: 220, armor: 9, r: 20, leak: 8, color: '#ffcf5c', accent: '#9a6f14' }
+};
+
+// Each wave is a list of groups: t=creep, n=count, gap=seconds between spawns,
+// delay=pause after the previous group, at=absolute offset from wave start.
+const WAVES = [
+  [{ t: 'grunt', n: 8, gap: .85 }],
+  [{ t: 'grunt', n: 12, gap: .7 }],
+  [{ t: 'grunt', n: 8, gap: .7 }, { t: 'runner', n: 5, gap: .5, delay: 1.2 }],
+  [{ t: 'runner', n: 12, gap: .45 }],
+  [{ t: 'grunt', n: 10, gap: .5 }, { t: 'brute', n: 3, gap: 1.6, at: 0 }],
+  [{ t: 'grunt', n: 16, gap: .45 }, { t: 'runner', n: 6, gap: .4, delay: 1 }],
+  [{ t: 'runner', n: 14, gap: .35 }, { t: 'brute', n: 3, gap: 1.5, at: 1 }],
+  [{ t: 'wraith', n: 10, gap: .5 }, { t: 'grunt', n: 10, gap: .4, at: 0 }],
+  [{ t: 'brute', n: 6, gap: 1.2 }, { t: 'runner', n: 10, gap: .4, at: 1 }],
+  [{ t: 'boss', n: 1, gap: 1 }, { t: 'grunt', n: 12, gap: .5, at: 2 }, { t: 'wraith', n: 6, gap: .6, at: 9 }],
+  [{ t: 'wraith', n: 14, gap: .4 }, { t: 'brute', n: 3, gap: 1.4, at: 2 }],
+  [{ t: 'runner', n: 20, gap: .3 }, { t: 'wraith', n: 8, gap: .5, at: 2 }],
+  [{ t: 'brute', n: 8, gap: 1 }, { t: 'wraith', n: 8, gap: .5, at: 1 }],
+  [{ t: 'grunt', n: 24, gap: .3 }, { t: 'runner', n: 14, gap: .3, at: 3 }],
+  [{ t: 'boss', n: 1, gap: 1 }, { t: 'brute', n: 5, gap: 1.3, at: 2 }, { t: 'runner', n: 12, gap: .35, at: 6 }],
+  [{ t: 'wraith', n: 18, gap: .35 }, { t: 'brute', n: 5, gap: 1.2, at: 3 }],
+  [{ t: 'brute', n: 10, gap: .8 }, { t: 'runner', n: 16, gap: .3, at: 2 }],
+  [{ t: 'runner', n: 24, gap: .25 }, { t: 'wraith', n: 12, gap: .4, at: 2 }],
+  [{ t: 'brute', n: 8, gap: .9 }, { t: 'wraith', n: 14, gap: .4, at: 1 }, { t: 'grunt', n: 16, gap: .3, at: 5 }],
+  [{ t: 'boss', n: 3, gap: 6 }, { t: 'brute', n: 10, gap: .8, at: 1 }, { t: 'runner', n: 20, gap: .3, at: 4 }, { t: 'wraith', n: 14, gap: .4, at: 12 }]
+];
+const TOTAL_WAVES = WAVES.length;
+
+const START_LIVES = 20, START_GOLD = 275, PREP_TIME = 14;
+
+function waveHpScale(wave) { return (1 + 0.12 * (wave - 1)) * Math.pow(1.045, wave - 1); }
+function waveReward(wave) { return 20 + 6 * wave; }
+
+function buildSchedule(wave) {
+  const out = [];
+  let cursor = 0;
+  for (const g of WAVES[wave - 1]) {
+    const gap = g.gap || .6;
+    const start = g.at !== undefined ? g.at : cursor + (g.delay || .6);
+    for (let i = 0; i < g.n; i++) out.push({ type: g.t, time: start + i * gap });
+    cursor = Math.max(cursor, start + (g.n - 1) * gap);
+  }
+  out.sort((a, b) => a.time - b.time);
+  return out;
+}
+
+/* ============================================================
+   State
+   ============================================================ */
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+const stage = document.getElementById('stage');
+
+let lives, gold, wave, score, killed, leaked, spent;
+let towers, creeps, shots, effects, texts;
+let state, prepLeft, schedule, spawnTimer, elapsed;
+let buildType = null, selected = null, hover = null;
+let paused = false, speed = 1;
+
+function resetGame() {
+  lives = START_LIVES; gold = START_GOLD; wave = 0; score = 0;
+  killed = 0; leaked = 0; spent = 0;
+  towers = []; creeps = []; shots = []; effects = []; texts = [];
+  state = 'prep'; prepLeft = PREP_TIME; schedule = []; spawnTimer = 0; elapsed = 0;
+  buildType = null; selected = null; paused = false; speed = 1;
+  document.getElementById('btn-speed').textContent = '1×';
+  document.getElementById('btn-pause').textContent = 'Pause';
+  refreshInspector();
+}
+
+function occupied(c, r) { return towers.some(t => t.c === c && t.r === r); }
+function buildable(c, r) {
+  return c >= 0 && c < COLS && r >= 0 && r < ROWS && !pathCells.has(c + ',' + r) && !occupied(c, r);
+}
+function towerAt(c, r) { return towers.find(t => t.c === c && t.r === r) || null; }
+
+const dmgOf  = t => TOWERS[t.type].damage * Math.pow(DMG_STEP, t.dmgLvl);
+const rateOf = t => TOWERS[t.type].rate * Math.pow(RATE_STEP, t.rateLvl);
+const rangeOf = t => TOWERS[t.type].range * TILE;
+const upCost = (t, lvl) => Math.round(TOWERS[t.type].cost * (0.55 + 0.45 * lvl));
+const sellValue = t => Math.floor(t.invested * SELL_RATE);
+
+/* ============================================================
+   Simulation
+   ============================================================ */
+function startWave() {
+  if (state !== 'prep') return;
+  const bonus = Math.ceil(prepLeft) * 3;
+  if (bonus > 0) { gold += bonus; floatText(PATH[1].x, PATH[1].y - 10, '+' + bonus + ' early', '#ffd166'); }
+  wave++;
+  schedule = buildSchedule(wave);
+  spawnTimer = 0;
+  state = 'wave';
+}
+
+function spawnCreep(type) {
+  const d = CREEPS[type];
+  const hp = Math.round(d.hp * waveHpScale(wave));
+  creeps.push({
+    type, name: d.name, x: PATH[0].x, y: PATH[0].y, seg: 0, t: 0, traveled: 0,
+    hp, max: hp, speed: d.speed, armor: d.armor, gold: d.gold, r: d.r,
+    leak: d.leak, color: d.color, accent: d.accent,
+    slow: 0, slowFactor: 1, hit: 0, dead: false, gone: false
+  });
+}
+
+function moveCreep(e, dt) {
+  let move = e.speed * (e.slow > 0 ? e.slowFactor : 1) * dt;
+  while (move > 0 && e.seg < segLen.length) {
+    const remain = segLen[e.seg] - e.t;
+    if (move < remain) { e.t += move; move = 0; }
+    else { move -= remain; e.seg++; e.t = 0; }
+  }
+  if (e.seg >= segLen.length) {   // walked off the right edge
+    e.gone = true;
+    lives -= e.leak; leaked++;
+    stage.classList.remove('shake'); void stage.offsetWidth; stage.classList.add('shake');
+    floatText(PATH[PATH.length - 1].x - 30, PATH[PATH.length - 1].y, '-' + e.leak + ' life', '#ff6b7a');
+    if (lives <= 0) { lives = 0; endGame(false); }
+    return;
+  }
+  const a = PATH[e.seg], b = PATH[e.seg + 1], f = e.t / segLen[e.seg];
+  e.x = a.x + (b.x - a.x) * f;
+  e.y = a.y + (b.y - a.y) * f;
+  e.traveled = segStart[e.seg] + e.t;
+}
+
+function damageCreep(e, amount, pierceArmor) {
+  if (e.dead) return;
+  const dmg = Math.max(1, amount - (pierceArmor ? 0 : e.armor));
+  e.hp -= dmg;
+  e.hit = 0.09;
+  if (e.hp <= 0) {
+    e.dead = true;
+    killed++;
+    gold += e.gold; score += e.gold;
+    floatText(e.x, e.y - e.r - 4, '+' + e.gold, '#ffd166');
+    burst(e.x, e.y, e.color, 10);
+  }
+}
+
+function pickTarget(t) {
+  const range = rangeOf(t);
+  let best = null, bestKey = -Infinity;
+  for (const e of creeps) {
+    if (e.dead || e.gone) continue;
+    const d = Math.hypot(e.x - t.x, e.y - t.y);
+    if (d > range + e.r) continue;
+    let key;
+    if (t.mode === 'strong') key = e.hp;
+    else if (t.mode === 'close') key = -d;
+    else key = e.traveled;                 // 'first' — furthest along the path
+    if (key > bestKey) { bestKey = key; best = e; }
+  }
+  return best;
+}
+
+function fire(t) {
+  const def = TOWERS[t.type];
+  const range = rangeOf(t);
+
+  if (def.kind === 'pulse') {
+    let touched = 0;
+    for (const e of creeps) {
+      if (e.dead || e.gone) continue;
+      if (Math.hypot(e.x - t.x, e.y - t.y) > range + e.r) continue;
+      damageCreep(e, dmgOf(t), false);
+      e.slow = def.slowTime;
+      e.slowFactor = 1 - def.slow;
+      touched++;
+    }
+    if (!touched) return false;
+    effects.push({ kind: 'ring', x: t.x, y: t.y, r0: 8, r1: range, life: .38, max: .38, color: def.color });
+    return true;
+  }
+
+  const target = pickTarget(t);
+  if (!target) return false;
+  t.angle = Math.atan2(target.y - t.y, target.x - t.x);
+
+  if (def.kind === 'beam') {
+    damageCreep(target, dmgOf(t), def.pierceArmor);
+    effects.push({ kind: 'beam', x: t.x, y: t.y, x2: target.x, y2: target.y, life: .16, max: .16, color: def.color });
+  } else {
+    shots.push({
+      x: t.x, y: t.y, tx: target.x, ty: target.y, target,
+      speed: def.bulletSpeed, damage: dmgOf(t), splash: def.splash || 0,
+      pierceArmor: !!def.pierceArmor, color: def.color, angle: t.angle,
+      big: def.kind === 'bullet' && !!def.splash
+    });
+  }
+  return true;
+}
+
+function impact(p) {
+  if (p.splash) {
+    const rad = p.splash * TILE;
+    for (const e of creeps) {
+      if (e.dead || e.gone) continue;
+      const d = Math.hypot(e.x - p.x, e.y - p.y);
+      if (d > rad + e.r) continue;
+      damageCreep(e, e === p.target ? p.damage : p.damage * 0.6, p.pierceArmor);
+    }
+    effects.push({ kind: 'ring', x: p.x, y: p.y, r0: 4, r1: rad, life: .3, max: .3, color: '#ffb45c' });
+    burst(p.x, p.y, '#ffb45c', 12);
+  } else if (p.target && !p.target.dead && !p.target.gone) {
+    damageCreep(p.target, p.damage, p.pierceArmor);
+    burst(p.x, p.y, p.color, 4);
+  }
+}
+
+function update(dt) {
+  elapsed += dt;
+
+  if (state === 'prep') {
+    prepLeft -= dt;
+    if (prepLeft <= 0) startWave();
+  } else if (state === 'wave') {
+    spawnTimer += dt;
+    while (schedule.length && schedule[0].time <= spawnTimer) spawnCreep(schedule.shift().type);
+  }
+
+  for (const e of creeps) {
+    if (e.dead || e.gone) continue;
+    if (e.slow > 0) e.slow -= dt;
+    if (e.hit > 0) e.hit -= dt;
+    moveCreep(e, dt);
+  }
+  creeps = creeps.filter(e => !e.dead && !e.gone);
+
+  for (const t of towers) {
+    t.cool -= dt;
+    if (t.cool <= 0) {
+      if (fire(t)) { t.cool = 1 / rateOf(t); t.flash = .08; }
+      else t.cool = 0;
+    }
+    if (t.flash > 0) t.flash -= dt;
+  }
+
+  for (const p of shots) {
+    if (p.target && !p.target.dead && !p.target.gone) { p.tx = p.target.x; p.ty = p.target.y; }
+    const dx = p.tx - p.x, dy = p.ty - p.y, d = Math.hypot(dx, dy);
+    const step = p.speed * dt;
+    if (d <= step + 2) { p.x = p.tx; p.y = p.ty; impact(p); p.done = true; }
+    else { p.x += dx / d * step; p.y += dy / d * step; p.angle = Math.atan2(dy, dx); }
+  }
+  shots = shots.filter(p => !p.done);
+
+  for (const f of effects) {
+    f.life -= dt;
+    if (f.kind === 'spark') { f.x += f.vx * dt; f.y += f.vy * dt; f.vx *= 0.94; f.vy *= 0.94; }
+  }
+  effects = effects.filter(f => f.life > 0);
+
+  for (const tx of texts) { tx.life -= dt; tx.y -= 22 * dt; }
+  texts = texts.filter(tx => tx.life > 0);
+
+  if (state === 'wave' && !schedule.length && !creeps.length) {
+    const reward = waveReward(wave);
+    gold += reward; score += reward;
+    floatText(W / 2, H / 2, 'Wave ' + wave + ' cleared  +' + reward, '#6ee7a0', 1.6, 20);
+    if (wave >= TOTAL_WAVES) endGame(true);
+    else { state = 'prep'; prepLeft = PREP_TIME; }
+  }
+}
+
+function floatText(x, y, text, color, life, size) {
+  texts.push({ x, y, text, color, life: life || .9, max: life || .9, size: size || 13 });
+}
+function burst(x, y, color, n) {
+  for (let i = 0; i < n; i++) {
+    const a = Math.random() * Math.PI * 2, s = 40 + Math.random() * 110;
+    effects.push({ kind: 'spark', x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, life: .35, max: .35, color });
+  }
+}
+
+/* ============================================================
+   Rendering
+   ============================================================ */
+function fitCanvas() {
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  canvas.width = W * dpr; canvas.height = H * dpr;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+}
+fitCanvas();
+window.addEventListener('resize', fitCanvas);
+
+function drawBoard() {
+  for (let r = 0; r < ROWS; r++) {
+    for (let c = 0; c < COLS; c++) {
+      ctx.fillStyle = (c + r) % 2 ? '#2b4632' : '#2f4c36';
+      ctx.fillRect(c * TILE, r * TILE, TILE, TILE);
+    }
+  }
+  // path
+  ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  ctx.beginPath();
+  ctx.moveTo(PATH[0].x, PATH[0].y);
+  for (let i = 1; i < PATH.length; i++) ctx.lineTo(PATH[i].x, PATH[i].y);
+  ctx.strokeStyle = '#59452c'; ctx.lineWidth = TILE; ctx.stroke();
+  ctx.strokeStyle = '#7a6142'; ctx.lineWidth = TILE - 9; ctx.stroke();
+  ctx.setLineDash([9, 13]);
+  ctx.strokeStyle = 'rgba(255,255,255,.10)'; ctx.lineWidth = 3; ctx.stroke();
+  ctx.setLineDash([]);
+
+  // entrance / exit markers
+  const a = PATH[0], z = PATH[PATH.length - 1];
+  ctx.fillStyle = 'rgba(110,231,160,.75)';
+  ctx.fillRect(0, a.y - TILE / 2 + 4, 5, TILE - 8);
+  ctx.fillStyle = 'rgba(255,107,122,.8)';
+  ctx.fillRect(W - 5, z.y - TILE / 2 + 4, 5, TILE - 8);
+}
+
+function drawPlacement() {
+  if (!hover) return;
+  const { c, r } = hover;
+  if (buildType) {
+    const ok = buildable(c, r) && gold >= TOWERS[buildType].cost;
+    ctx.fillStyle = ok ? 'rgba(110,231,160,.28)' : 'rgba(255,107,122,.3)';
+    ctx.fillRect(c * TILE, r * TILE, TILE, TILE);
+    ctx.strokeStyle = ok ? '#6ee7a0' : '#ff6b7a'; ctx.lineWidth = 2;
+    ctx.strokeRect(c * TILE + 1, r * TILE + 1, TILE - 2, TILE - 2);
+    drawRange(c * TILE + TILE / 2, r * TILE + TILE / 2, TOWERS[buildType].range * TILE, TOWERS[buildType].color);
+  } else if (towerAt(c, r)) {
+    ctx.strokeStyle = 'rgba(255,255,255,.5)'; ctx.lineWidth = 2;
+    ctx.strokeRect(c * TILE + 1, r * TILE + 1, TILE - 2, TILE - 2);
+  }
+}
+
+function drawRange(x, y, r, color) {
+  ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2);
+  ctx.fillStyle = 'rgba(255,255,255,.05)'; ctx.fill();
+  ctx.strokeStyle = color; ctx.globalAlpha = .65; ctx.lineWidth = 1.5;
+  ctx.setLineDash([6, 6]); ctx.stroke(); ctx.setLineDash([]);
+  ctx.globalAlpha = 1;
+}
+
+function roundRect(x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.arcTo(x + w, y, x + w, y + h, r);
+  ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r);
+  ctx.arcTo(x, y, x + w, y, r);
+  ctx.closePath();
+}
+
+function drawTower(t) {
+  const def = TOWERS[t.type];
+  const x = t.x, y = t.y;
+
+  ctx.fillStyle = 'rgba(0,0,0,.28)';
+  roundRect(x - 15, y - 12, 30, 28, 7); ctx.fill();
+  ctx.fillStyle = def.accent;
+  roundRect(x - 15, y - 15, 30, 30, 7); ctx.fill();
+  ctx.fillStyle = def.color;
+  roundRect(x - 11, y - 11, 22, 22, 5); ctx.fill();
+
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(t.angle);
+  ctx.fillStyle = '#131a26';
+  if (t.type === 'cannon') { roundRect(0, -6, 20, 12, 4); ctx.fill(); }
+  else if (t.type === 'arrow') { ctx.fillRect(0, -3, 18, 6); }
+  else if (t.type === 'arcane') { roundRect(2, -4, 20, 8, 3); ctx.fill(); }
+  else { ctx.beginPath(); ctx.arc(0, 0, 7, 0, Math.PI * 2); ctx.fill(); }
+  ctx.restore();
+
+  if (t.flash > 0) {
+    ctx.globalAlpha = Math.min(1, t.flash / .08) * .7;
+    ctx.fillStyle = '#fff';
+    ctx.beginPath(); ctx.arc(x, y, 15, 0, Math.PI * 2); ctx.fill();
+    ctx.globalAlpha = 1;
+  }
+
+  // upgrade pips: damage on the left, fire rate on the right
+  for (let i = 0; i < t.dmgLvl; i++) {
+    ctx.fillStyle = '#ff9f6b';
+    ctx.fillRect(x - 15, y + 17 - i * 4, 5, 3);
+  }
+  for (let i = 0; i < t.rateLvl; i++) {
+    ctx.fillStyle = '#7fd8ef';
+    ctx.fillRect(x + 10, y + 17 - i * 4, 5, 3);
+  }
+}
+
+function drawCreep(e) {
+  const frac = Math.max(0, e.hp / e.max);
+
+  ctx.fillStyle = 'rgba(0,0,0,.3)';
+  ctx.beginPath(); ctx.ellipse(e.x, e.y + e.r * .8, e.r * .9, e.r * .4, 0, 0, Math.PI * 2); ctx.fill();
+
+  ctx.beginPath(); ctx.arc(e.x, e.y, e.r, 0, Math.PI * 2);
+  ctx.fillStyle = e.hit > 0 ? '#ffffff' : e.color; ctx.fill();
+  ctx.lineWidth = 2.5; ctx.strokeStyle = e.accent; ctx.stroke();
+
+  if (e.type === 'boss') {
+    ctx.fillStyle = '#fff6d8';
+    ctx.beginPath();
+    ctx.moveTo(e.x - 9, e.y - e.r - 2); ctx.lineTo(e.x - 4, e.y - e.r - 11);
+    ctx.lineTo(e.x, e.y - e.r - 4); ctx.lineTo(e.x + 4, e.y - e.r - 11);
+    ctx.lineTo(e.x + 9, e.y - e.r - 2); ctx.closePath(); ctx.fill();
+  }
+  if (e.slow > 0) {
+    ctx.globalAlpha = .45; ctx.fillStyle = '#7fd8ef';
+    ctx.beginPath(); ctx.arc(e.x, e.y, e.r + 2, 0, Math.PI * 2); ctx.fill();
+    ctx.globalAlpha = 1;
+  }
+
+  const bw = e.r * 2.2, bx = e.x - bw / 2, by = e.y - e.r - 8;
+  ctx.fillStyle = 'rgba(0,0,0,.55)'; ctx.fillRect(bx - 1, by - 1, bw + 2, 5);
+  ctx.fillStyle = frac > .5 ? '#6ee7a0' : frac > .25 ? '#ffd166' : '#ff6b7a';
+  ctx.fillRect(bx, by, bw * frac, 3);
+}
+
+function drawEffects() {
+  for (const f of effects) {
+    const k = f.life / f.max;
+    if (f.kind === 'ring') {
+      ctx.globalAlpha = k * .8;
+      ctx.strokeStyle = f.color; ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.arc(f.x, f.y, f.r0 + (f.r1 - f.r0) * (1 - k), 0, Math.PI * 2); ctx.stroke();
+    } else if (f.kind === 'beam') {
+      ctx.globalAlpha = k;
+      ctx.strokeStyle = f.color; ctx.lineWidth = 2 + 4 * k;
+      ctx.beginPath(); ctx.moveTo(f.x, f.y); ctx.lineTo(f.x2, f.y2); ctx.stroke();
+    } else {
+      ctx.globalAlpha = k;
+      ctx.fillStyle = f.color;
+      ctx.fillRect(f.x - 1.5, f.y - 1.5, 3, 3);
+    }
+    ctx.globalAlpha = 1;
+  }
+  for (const p of shots) {
+    ctx.save();
+    ctx.translate(p.x, p.y); ctx.rotate(p.angle);
+    ctx.fillStyle = p.color;
+    if (p.big) { ctx.beginPath(); ctx.arc(0, 0, 5, 0, Math.PI * 2); ctx.fill(); }
+    else ctx.fillRect(-5, -1.5, 10, 3);
+    ctx.restore();
+  }
+  ctx.textAlign = 'center';
+  for (const tx of texts) {
+    ctx.globalAlpha = Math.min(1, tx.life / tx.max * 1.6);
+    ctx.fillStyle = tx.color;
+    ctx.font = '700 ' + tx.size + 'px ui-rounded, system-ui, sans-serif';
+    ctx.fillText(tx.text, tx.x, tx.y);
+    ctx.globalAlpha = 1;
+  }
+  ctx.textAlign = 'left';
+}
+
+function draw() {
+  drawBoard();
+  drawPlacement();
+  if (selected) drawRange(selected.x, selected.y, rangeOf(selected), TOWERS[selected.type].color);
+  for (const t of towers) drawTower(t);
+  for (const e of creeps) drawCreep(e);
+  drawEffects();
+
+  if (state === 'prep' && wave < TOTAL_WAVES) {
+    ctx.textAlign = 'center';
+    ctx.fillStyle = 'rgba(233,237,246,.75)';
+    ctx.font = '700 15px ui-rounded, system-ui, sans-serif';
+    ctx.fillText('Wave ' + (wave + 1) + ' in ' + Math.ceil(prepLeft) + 's  —  build now', W / 2, 26);
+    ctx.textAlign = 'left';
+  }
+  if (paused && state !== 'over' && state !== 'won') {
+    ctx.fillStyle = 'rgba(8,11,17,.55)'; ctx.fillRect(0, 0, W, H);
+    ctx.textAlign = 'center'; ctx.fillStyle = '#e9edf6';
+    ctx.font = '700 34px ui-rounded, system-ui, sans-serif';
+    ctx.fillText('Paused', W / 2, H / 2);
+    ctx.textAlign = 'left';
+  }
+}
+
+/* ============================================================
+   UI
+   ============================================================ */
+const el = id => document.getElementById(id);
+const shopEl = el('shop'), overlay = el('overlay');
+const cards = {};
+
+TOWER_KEYS.forEach((key, i) => {
+  const def = TOWERS[key];
+  const b = document.createElement('button');
+  b.className = 'card';
+  b.innerHTML =
+    '<span class="swatch" style="background:' + def.color + ';border-color:' + def.accent + '"></span>' +
+    '<span><span class="cname">' + (i + 1) + '. ' + def.name + '</span>' +
+    '<span class="cdesc">' + def.desc + '<br>rng ' + def.range.toFixed(1) +
+    ' · dmg ' + def.damage + ' · ' + def.rate.toFixed(2) + '/s</span></span>' +
+    '<span class="ccost">' + def.cost + 'g</span>';
+  b.addEventListener('click', () => selectBuild(key));
+  shopEl.appendChild(b);
+  cards[key] = b;
+});
+
+function selectBuild(key) {
+  buildType = buildType === key ? null : key;
+  if (buildType) selected = null;
+  refreshInspector();
+}
+
+function refreshInspector() {
+  const has = !!selected;
+  el('insp-empty').classList.toggle('hidden', has);
+  el('insp-tower').classList.toggle('hidden', !has);
+  if (!has) return;
+  const t = selected, def = TOWERS[t.type];
+  el('it-name').innerHTML = '<b>' + def.name + '</b>';
+  const dps = dmgOf(t) * rateOf(t);
+  const rows = [
+    ['Damage', dmgOf(t).toFixed(0) + pips(t.dmgLvl)],
+    ['Fire rate', rateOf(t).toFixed(2) + '/s' + pips(t.rateLvl)],
+    ['Range', (rangeOf(t) / TILE).toFixed(1) + ' tiles'],
+    [def.kind === 'pulse' ? 'Pulse DPS' : 'DPS', dps.toFixed(0)],
+    ['Invested', t.invested + 'g']
+  ];
+  if (def.splash) rows.splice(3, 0, ['Splash', def.splash.toFixed(1) + ' tiles']);
+  if (def.slow) rows.splice(3, 0, ['Slow', Math.round(def.slow * 100) + '% / ' + def.slowTime + 's']);
+  if (def.pierceArmor) rows.splice(3, 0, ['Armor', 'ignored']);
+  lastBtns = '';
+  el('it-stats').innerHTML = rows
+    .map(r => '<div class="statrow"><span>' + r[0] + '</span><span>' + r[1] + '</span></div>').join('');
+  syncButtons();
+}
+
+function pips(lvl) {
+  let s = '<span class="pips">';
+  for (let i = 0; i < MAX_LVL; i++) s += '<span class="pip' + (i < lvl ? ' on' : '') + '"></span>';
+  return s + '</span>';
+}
+
+let lastBtns = '';
+function syncButtons() {
+  const t = selected;
+  if (!t) { lastBtns = ''; return; }
+  const key = t.dmgLvl + '|' + t.rateLvl + '|' + t.mode + '|' + t.invested + '|' + Math.floor(gold);
+  if (key === lastBtns) return;
+  lastBtns = key;
+  const dBtn = el('up-dmg'), rBtn = el('up-rate');
+  if (t.dmgLvl >= MAX_LVL) { dBtn.textContent = 'Damage — max'; dBtn.disabled = true; }
+  else {
+    const c = upCost(t, t.dmgLvl);
+    dBtn.innerHTML = '↑ Damage +35% <span class="cost">' + c + 'g</span>';
+    dBtn.disabled = gold < c;
+  }
+  if (t.rateLvl >= MAX_LVL) { rBtn.textContent = 'Fire rate — max'; rBtn.disabled = true; }
+  else {
+    const c = upCost(t, t.rateLvl);
+    rBtn.innerHTML = '↑ Fire rate +20% <span class="cost">' + c + 'g</span>';
+    rBtn.disabled = gold < c;
+  }
+  el('it-target').textContent = '◎ Target: ' + t.mode;
+  el('it-sell').innerHTML = '✕ Sell <span class="cost">+' + sellValue(t) + 'g</span>';
+}
+
+function upgrade(track) {
+  const t = selected;
+  if (!t) return;
+  const lvl = track === 'dmg' ? t.dmgLvl : t.rateLvl;
+  if (lvl >= MAX_LVL) return;
+  const c = upCost(t, lvl);
+  if (gold < c) return;
+  gold -= c; spent += c; t.invested += c;
+  if (track === 'dmg') t.dmgLvl++; else t.rateLvl++;
+  floatText(t.x, t.y - 20, '-' + c + 'g', '#ffd166');
+  refreshInspector();
+}
+
+el('up-dmg').addEventListener('click', () => upgrade('dmg'));
+el('up-rate').addEventListener('click', () => upgrade('rate'));
+el('it-target').addEventListener('click', () => {
+  if (!selected) return;
+  const modes = ['first', 'strong', 'close'];
+  selected.mode = modes[(modes.indexOf(selected.mode) + 1) % modes.length];
+  syncButtons();
+});
+el('it-sell').addEventListener('click', sellSelected);
+
+function sellSelected() {
+  if (!selected) return;
+  gold += sellValue(selected);
+  floatText(selected.x, selected.y - 20, '+' + sellValue(selected) + 'g', '#6ee7a0');
+  towers = towers.filter(t => t !== selected);
+  selected = null;
+  refreshInspector();
+}
+
+let lastHud = '';
+function syncHUD() {
+  const key = lives + '|' + Math.floor(gold) + '|' + wave + '|' + state + '|' + Math.ceil(prepLeft) + '|' + creeps.length + '|' + schedule.length;
+  if (key !== lastHud) {
+    lastHud = key;
+    el('lives-v').textContent = lives;
+    el('gold-v').textContent = Math.floor(gold);
+    el('wave-v').textContent = Math.max(wave, 0) + '/' + TOTAL_WAVES;
+    if (state === 'prep') {
+      el('wave-info').textContent = 'Wave ' + (wave + 1) + ' in ' + Math.ceil(prepLeft) + 's · send early for +' +
+        (Math.ceil(prepLeft) * 3) + 'g';
+    } else if (state === 'wave') {
+      el('wave-info').textContent = 'Wave ' + wave + ' · ' + creeps.length + ' on the field, ' + schedule.length + ' to come';
+    } else {
+      el('wave-info').textContent = state === 'won' ? 'The keep holds!' : 'The keep has fallen.';
+    }
+    el('btn-send').disabled = state !== 'prep';
+  }
+  for (const key2 of TOWER_KEYS) {
+    cards[key2].classList.toggle('selected', buildType === key2);
+    cards[key2].classList.toggle('poor', gold < TOWERS[key2].cost);
+  }
+  syncButtons();
+}
+
+function showOverlay(title, sub, stats, btn) {
+  el('ov-title').textContent = title;
+  el('ov-sub').innerHTML = sub;
+  el('ov-stats').innerHTML = stats;
+  el('ov-btn').textContent = btn;
+  overlay.classList.remove('hidden');
+}
+
+function endGame(won) {
+  state = won ? 'won' : 'over';
+  buildType = null; selected = null;
+  refreshInspector();
+  const mins = Math.floor(elapsed / 60), secs = Math.floor(elapsed % 60);
+  const stats =
+    '<div class="s">Waves<b>' + wave + '/' + TOTAL_WAVES + '</b></div>' +
+    '<div class="s">Score<b>' + score + '</b></div>' +
+    '<div class="s">Kills<b>' + killed + '</b></div>' +
+    '<div class="s">Leaks<b>' + leaked + '</b></div>' +
+    '<div class="s">Lives<b>' + lives + '</b></div>' +
+    '<div class="s">Spent<b>' + spent + 'g</b></div>' +
+    '<div class="s">Time<b>' + mins + ':' + String(secs).padStart(2, '0') + '</b></div>';
+  showOverlay(
+    won ? '🏆 Victory!' : '💀 Game over',
+    won ? 'All ' + TOTAL_WAVES + ' waves broken against your towers.'
+        : 'The creeps overran the keep on wave ' + wave + '.',
+    stats, 'Play again'
+  );
+}
+
+el('ov-btn').addEventListener('click', () => {
+  overlay.classList.add('hidden');
+  resetGame();
+});
+el('btn-send').addEventListener('click', startWave);
+el('btn-pause').addEventListener('click', () => {
+  paused = !paused;
+  el('btn-pause').textContent = paused ? 'Resume' : 'Pause';
+});
+el('btn-speed').addEventListener('click', () => {
+  speed = speed === 1 ? 2 : 1;
+  el('btn-speed').textContent = speed + '×';
+});
+
+/* ============================================================
+   Input
+   ============================================================ */
+function cellFromEvent(ev) {
+  const rect = canvas.getBoundingClientRect();
+  const x = (ev.clientX - rect.left) / rect.width * W;
+  const y = (ev.clientY - rect.top) / rect.height * H;
+  return { c: Math.floor(x / TILE), r: Math.floor(y / TILE) };
+}
+
+canvas.addEventListener('pointermove', ev => { hover = cellFromEvent(ev); });
+canvas.addEventListener('pointerleave', () => { hover = null; });
+canvas.addEventListener('contextmenu', ev => { ev.preventDefault(); buildType = null; refreshInspector(); });
+
+canvas.addEventListener('pointerdown', ev => {
+  if (state === 'over' || state === 'won') return;
+  const cell = cellFromEvent(ev);
+  hover = cell;
+  const { c, r } = cell;
+  if (c < 0 || c >= COLS || r < 0 || r >= ROWS) return;
+
+  if (buildType) {
+    const def = TOWERS[buildType];
+    const existing = towerAt(c, r);
+    if (existing) {                       // tapping a built tower inspects it instead
+      selected = existing; buildType = null; refreshInspector(); return;
+    }
+    if (!buildable(c, r)) {
+      floatText(c * TILE + TILE / 2, r * TILE + TILE / 2, 'blocked', '#ff6b7a', .6);
+      return;
+    }
+    if (gold < def.cost) {
+      floatText(c * TILE + TILE / 2, r * TILE + TILE / 2, 'need ' + (def.cost - Math.floor(gold)) + 'g', '#ff6b7a', .8);
+      return;
+    }
+    gold -= def.cost; spent += def.cost;
+    const t = {
+      type: buildType, c, r, x: c * TILE + TILE / 2, y: r * TILE + TILE / 2,
+      dmgLvl: 0, rateLvl: 0, cool: 0, angle: -Math.PI / 2, flash: 0,
+      mode: 'first', invested: def.cost
+    };
+    towers.push(t);
+    selected = t;
+    if (!ev.shiftKey) buildType = null;
+    refreshInspector();
+    return;
+  }
+  selected = towerAt(c, r);
+  refreshInspector();
+});
+
+window.addEventListener('keydown', ev => {
+  const k = ev.key.toLowerCase();
+  if (k >= '1' && k <= String(TOWER_KEYS.length)) selectBuild(TOWER_KEYS[+k - 1]);
+  else if (k === 'escape') { buildType = null; selected = null; refreshInspector(); }
+  else if (k === ' ') { ev.preventDefault(); el('btn-pause').click(); }
+  else if (k === 'enter') startWave();
+  else if (k === 'f') el('btn-speed').click();
+  else if (k === 'u') upgrade('dmg');
+  else if (k === 'i') upgrade('rate');
+  else if (k === 'x') sellSelected();
+});
+
+/* ============================================================
+   Loop
+   ============================================================ */
+let last = performance.now();
+function frame(now) {
+  const raw = Math.min((now - last) / 1000, 0.05);
+  last = now;
+  const running = !paused && overlay.classList.contains('hidden') && state !== 'over' && state !== 'won';
+  if (running) {
+    let dt = raw * speed;
+    // step in slices so fast-forward stays accurate
+    while (dt > 0) { const s = Math.min(dt, 0.025); update(s); dt -= s; }
+  }
+  draw();
+  syncHUD();
+  requestAnimationFrame(frame);
+}
+
+resetGame();
+showOverlay(
+  'Creep Keep',
+  'Creeps march the dirt road from the left. Build towers on the grass, spend the gold they drop, ' +
+  'and keep them from reaching the far edge. ' + TOTAL_WAVES + ' waves, ' + START_LIVES + ' lives.',
+  '', 'Play'
+);
+requestAnimationFrame(frame);
+
+})();
+</script>
+</body>
+</html>

@@ -72,3 +72,52 @@ game.js      — the whole engine: world gen, meshing, physics, mobs, controls
 Everything is intentionally dependency-light and in one place so it's easy to hack on. Want a new Pokémon? Add an entry to `MOB_TYPES` in `game.js`. Want a new block? Add it to `BLOCKS`.
 
 Have fun, Trainer! 🔴
+
+---
+
+# 🏰 Creep Keep — Tower Defense
+
+A second, completely separate game lives in this repo: **`towerdefense.html`**. Open that
+one file in any browser (or `python3 -m http.server 8000` and visit `/towerdefense.html`).
+Like PokéCraft it's dependency-free — one self-contained HTML file, canvas 2D.
+
+Creeps march the dirt road from the left edge to the right. Build towers on the grass,
+spend the gold they drop, and don't let 20 lives run out before wave 20 is broken.
+
+## 🗼 Towers
+
+| Tower | Cost | Range | Damage | Rate | Special |
+| --- | --- | --- | --- | --- | --- |
+| Arrow Nest | 70g | 3.1 | 14 | 1.80/s | Cheap, fast single-target shots |
+| Bombard | 135g | 2.7 | 36 | 0.62/s | Lobbed shells, 1.2-tile splash |
+| Frost Spire | 110g | 2.5 | 9 | 1.00/s | Pulses; slows every creep in range 45% for 1.8s |
+| Arcane Beam | 240g | 5.4 | 95 | 0.50/s | Long reach, hitscan beam, ignores armor |
+
+Every tower has two upgrade tracks, four levels each: **damage** (+35% per level) and
+**fire rate** (+20% per level). Upgrade cost scales with the level; selling refunds 65%
+of everything invested in that tower. Each tower also has a targeting mode —
+first / strongest / closest.
+
+## 👾 Creeps
+
+Grunts, fast Runners, armored Wraiths, heavy Brutes, and a Warlord boss on waves 10, 15
+and 20 (three of them on the last wave). Health scales with the wave number; armor
+subtracts flat damage from every hit, so armored waves want Arcane Beams or bigger hits.
+
+## 🎮 Controls
+
+| Action | Control |
+| --- | --- |
+| Pick a tower | Click a shop card, or `1`–`4` |
+| Build | Click a grass tile (hold Shift to keep building the same type) |
+| Inspect / upgrade | Click a built tower |
+| Upgrade damage / fire rate | `U` / `I` |
+| Sell tower | `X` |
+| Cancel selection | `Esc` or right-click |
+| Send the next wave early | `Enter` (early call pays a gold bonus) |
+| Pause | `Space` |
+| Fast-forward 2× | `F` |
+
+Clearing a wave pays a bonus, and calling a wave in early pays 3g per second of prep time
+you skip. Survive all 20 waves for the victory screen; lose all 20 lives and it's game
+over — either way the end screen restarts with one button.
